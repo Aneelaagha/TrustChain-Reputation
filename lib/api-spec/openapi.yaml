@@ -1,0 +1,420 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: TrustChain - Financial Reputation API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: users
+    description: User operations
+  - name: scores
+    description: Trust score operations
+  - name: signals
+    description: Financial signal operations
+  - name: vouches
+    description: Vouch relationship operations
+  - name: network
+    description: Trust network operations
+  - name: explain
+    description: AI explanation operations
+  - name: seed
+    description: Data seeding
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /users:
+    post:
+      operationId: createOrFindUser
+      tags: [users]
+      summary: Create or find user by email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserBody"
+      responses:
+        "200":
+          description: User found or created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/all:
+    get:
+      operationId: getAllUsers
+      tags: [users]
+      summary: Get all users
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /scores:
+    get:
+      operationId: getAllScores
+      tags: [scores]
+      summary: Get all computed trust scores
+      responses:
+        "200":
+          description: Map of userId to score
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AllScores"
+
+  /scores/{id}:
+    get:
+      operationId: getUserScore
+      tags: [scores]
+      summary: Get one user's score and breakdown
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Score with breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserScoreBreakdown"
+
+  /signal:
+    post:
+      operationId: addSignal
+      tags: [signals]
+      summary: Add a financial signal for a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddSignalBody"
+      responses:
+        "200":
+          description: Signal added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Signal"
+
+  /vouch:
+    post:
+      operationId: addVouch
+      tags: [vouches]
+      summary: Vouch for another user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddVouchBody"
+      responses:
+        "200":
+          description: Vouch created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vouch"
+
+  /explain:
+    post:
+      operationId: explainScore
+      tags: [explain]
+      summary: Get AI explanation for a user's trust score
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExplainBody"
+      responses:
+        "200":
+          description: AI explanation text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExplainResponse"
+
+  /network:
+    get:
+      operationId: getNetwork
+      tags: [network]
+      summary: Get trust network graph data
+      responses:
+        "200":
+          description: Network nodes and links
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkData"
+
+  /seed:
+    get:
+      operationId: seedDatabase
+      tags: [seed]
+      summary: Seed database with fake data
+      responses:
+        "200":
+          description: Seed complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeedResponse"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        created_at:
+          type: string
+      required:
+        - id
+        - name
+        - email
+        - created_at
+
+    CreateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+      required:
+        - name
+        - email
+
+    AllScores:
+      type: object
+      additionalProperties:
+        type: number
+      description: Map of userId to score (300-850)
+
+    ScoreBreakdownItem:
+      type: object
+      properties:
+        label:
+          type: string
+        points:
+          type: number
+      required:
+        - label
+        - points
+
+    UserScoreBreakdown:
+      type: object
+      properties:
+        userId:
+          type: string
+        score:
+          type: number
+        breakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScoreBreakdownItem"
+        vouchers:
+          type: array
+          items:
+            $ref: "#/components/schemas/VoucherInfo"
+      required:
+        - userId
+        - score
+        - breakdown
+        - vouchers
+
+    VoucherInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        score:
+          type: number
+        strength:
+          type: number
+      required:
+        - id
+        - name
+        - score
+        - strength
+
+    Signal:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        type:
+          type: string
+        months_consistent:
+          type: number
+        created_at:
+          type: string
+      required:
+        - id
+        - user_id
+        - type
+        - months_consistent
+        - created_at
+
+    AddSignalBody:
+      type: object
+      properties:
+        userId:
+          type: string
+        type:
+          type: string
+          enum: [rent, utility, mobile, default]
+        months_consistent:
+          type: number
+      required:
+        - userId
+        - type
+        - months_consistent
+
+    Vouch:
+      type: object
+      properties:
+        id:
+          type: string
+        voucher_id:
+          type: string
+        vouchee_id:
+          type: string
+        strength:
+          type: number
+        created_at:
+          type: string
+      required:
+        - id
+        - voucher_id
+        - vouchee_id
+        - strength
+        - created_at
+
+    AddVouchBody:
+      type: object
+      properties:
+        voucherId:
+          type: string
+        voucheeId:
+          type: string
+        strength:
+          type: number
+      required:
+        - voucherId
+        - voucheeId
+        - strength
+
+    ExplainBody:
+      type: object
+      properties:
+        userId:
+          type: string
+      required:
+        - userId
+
+    ExplainResponse:
+      type: object
+      properties:
+        explanation:
+          type: string
+      required:
+        - explanation
+
+    NetworkNode:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        score:
+          type: number
+      required:
+        - id
+        - name
+        - score
+
+    NetworkLink:
+      type: object
+      properties:
+        source:
+          type: string
+        target:
+          type: string
+        strength:
+          type: number
+      required:
+        - source
+        - target
+        - strength
+
+    NetworkData:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkNode"
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkLink"
+      required:
+        - nodes
+        - links
+
+    SeedResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        usersCreated:
+          type: number
+      required:
+        - message
+        - usersCreated

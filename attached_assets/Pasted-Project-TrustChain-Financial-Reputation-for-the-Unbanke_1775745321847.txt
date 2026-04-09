@@ -1,0 +1,144 @@
+Project: TrustChain — Financial Reputation for the Unbanked
+Build a full-stack web app called TrustChain. Here is everything you need to build it from scratch.
+
+STACK
+
+Frontend: Next.js 14 (App Router) + Tailwind CSS
+Backend: Next.js API routes (no separate server needed)
+Database: Supabase (PostgreSQL) — use the Supabase JS client
+Graph algorithm: custom JavaScript (no external graph library — write it from scratch)
+AI layer: Anthropic Claude API (claude-sonnet-4-20250514) for score explanations
+Charts: recharts for score breakdown bar chart
+Graph viz: react-force-graph for the trust network visualization
+Auth: skip for hackathon — use a simple name/email input to "log in" (store user ID in localStorage)
+Deploy target: Vercel (so keep everything in Next.js API routes)
+
+
+DATABASE SCHEMA
+Create these tables in Supabase:
+sqlcreate table users (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text unique not null,
+  created_at timestamp default now()
+);
+
+create table signals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id),
+  type text not null, -- 'rent', 'utility', 'mobile', 'default'
+  months_consistent integer default 0,
+  created_at timestamp default now()
+);
+
+create table vouches (
+  id uuid primary key default gen_random_uuid(),
+  voucher_id uuid references users(id),
+  vouchee_id uuid references users(id),
+  strength integer default 5, -- 1-10
+  created_at timestamp default now()
+);
+Seed the DB with 30 fake users, randomized signals, and random vouch relationships using a /api/seed endpoint that runs once.
+
+THE TRUST SCORE ALGORITHM
+Implement this in /lib/trustScore.js. This is the core IP — implement it carefully.
+function computeTrustScores(users, signals, vouches):
+
+  1. Build signal scores per user:
+     - rent signal: months_consistent × 8 points
+     - utility signal: months_consistent × 5 points
+     - mobile signal: months_consistent × 4 points
+     - default penalty: count × −20 points
+     - own_score[user] = sum of all their signals
+
+  2. Build adjacency: 
+     - For each vouch (A vouches for B):
+       edge weight = (strength / 10)
+       store as graph[A] -> [{node: B, weight}]
+
+  3. Run trust propagation (10 iterations):
+     - ALPHA = 0.6
+     - Each iteration:
+       new_score[u] = ALPHA × own_score[u]
+                    + (1 - ALPHA) × Σ( score[v] × edge_weight(v→u) )
+                      for all v that vouch for u
+     - After each iteration, normalize scores to 0-600 range
+
+  4. Map final score to 300–850 range (FICO-style)
+
+  5. Return { userId -> score } map
+Expose this via GET /api/scores which returns all user scores.
+
+AI EXPLANATION LAYER
+Create /api/explain — POST endpoint.
+Takes { userId }, fetches that user's signals, vouches, and score. Then calls the Claude API:
+POST https://api.anthropic.com/v1/messages
+model: claude-sonnet-4-20250514
+max_tokens: 300
+system: "You are TrustChain, a financial reputation system. Explain a person's trust score in 2-3 warm, encouraging sentences. Be specific about what's helping and what could improve. Never be condescending."
+user: "User has score {score}/850. Signals: {rent} months rent on time, {utility} months utility bills, {mobile} months mobile top-ups, {defaults} defaults. They have {vouchCount} vouchers. Explain their score."
+Return the explanation text to the frontend.
+
+PAGES TO BUILD
+/ — Landing / Login
+
+App name "TrustChain" + tagline: "Financial reputation for everyone."
+Simple form: enter your name + email → creates or finds user → saves userId to localStorage → redirects to /dashboard
+Show a stat: "1.4 billion adults have no credit score. TrustChain changes that."
+
+/dashboard — Main screen
+
+Top: large score badge (300–850). Color: green if ≥700, amber if 580–699, coral if below.
+Below score: AI-generated explanation (fetch from /api/explain on load). Show a loading skeleton while it fetches.
+Score breakdown bar chart (recharts horizontal bars): Rent signal, Utility signal, Mobile signal, Vouch trust, Defaults. Each bar shows points contribution.
+"My vouchers" section: list of people who have vouched for you, with their names and scores.
+Button: "Vouch for someone" → opens modal with a dropdown of all users → select one → calls POST /api/vouch → refreshes score.
+Button: "Add a signal" → opens modal → choose type (rent/utility/mobile/default) + enter months → calls POST /api/signal → refreshes score.
+
+/network — Trust graph
+
+Full-page react-force-graph visualization
+Nodes = users (sized by their trust score, colored green/amber/coral by score tier)
+Edges = vouch relationships (directed arrows)
+Clicking a node shows a tooltip: name + score + vouch count
+Current user's node is highlighted with a white ring
+Title: "Your trust network"
+
+
+API ROUTES
+POST /api/users          — create or find user by email
+GET  /api/scores         — return all computed trust scores
+GET  /api/scores/[id]    — return one user's score + breakdown
+POST /api/signal         — body: { userId, type, months_consistent }
+POST /api/vouch          — body: { voucherId, voucheeId, strength }
+POST /api/explain        — body: { userId } → returns AI explanation string
+GET  /api/network        — returns { nodes: [{id, name, score}], links: [{source, target, strength}] }
+GET  /api/seed           — seeds DB with fake data (run once)
+
+ENVIRONMENT VARIABLES NEEDED
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+ANTHROPIC_API_KEY=
+
+DESIGN GUIDELINES
+
+Color palette: teal (#1D9E75) as primary brand color, white backgrounds, slate gray text
+Score badge: large (80px font), rounded pill, color-coded
+Font: system sans-serif (Inter if available)
+Mobile-first responsive layout
+No external UI library — just Tailwind utility classes
+Keep it clean and minimal — this is a fintech tool, not a social app
+
+
+WHAT TO BUILD FIRST (in order)
+
+Supabase tables + seed endpoint
+The trust score algorithm in /lib/trustScore.js — test it standalone
+All API routes
+Dashboard page with score + chart
+Network graph page
+Landing/login page
+AI explanation integration last (needs API key)
+
+
+Build the complete working app. Make sure the trust network graph is interactive and the score updates live when you add signals or vouches. The /network page with the force-directed graph is the most impressive part — make it look great.

@@ -115,7 +115,8 @@ export default function Dashboard() {
   const onVouchSubmit = (values: z.infer<typeof vouchSchema>) => {
     if (!userId) return;
     addVouch.mutate({ data: { voucherId: userId, voucheeId: values.voucheeId, strength: values.strength } }, {
-      onSuccess: () => { setVouchOpen(false); vouchForm.reset(); refreshAll(userId); }
+      onSuccess: () => { setVouchOpen(false); vouchForm.reset(); refreshAll(userId); },
+      onError: (err) => { console.error("Vouch failed:", err); alert("Vouch failed: " + JSON.stringify(err)); }
     });
   };
 
